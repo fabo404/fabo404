@@ -48,6 +48,7 @@
         <button class="mini-btn danger" id="wipeBtn" title="Alle Spuren auf diesem PC löschen">⌫ Wipe</button>
       </div>
       <input type="file" id="usbFile" accept="application/json" hidden />
+      <div class="account-chip" id="accountChip" hidden></div>
       <div class="mode-pill" id="modePill">Portable · Demo</div>
     </div>
   </aside>
@@ -161,7 +162,30 @@
     </div>
   </div>
 
+  <!-- ===== Login-Bildschirm (nur wenn Cloud-Konto konfiguriert) ===== -->
+  <div class="auth-gate" id="authGate" hidden>
+    <div class="auth-card">
+      <div class="auth-brand"><span class="auth-flake">❄️</span> Freezy AI</div>
+      <h2 id="authTitle">Anmelden</h2>
+      <p class="auth-sub" id="authSub">Melde dich an — danach sind deine Anbieter auf jedem Gerät sofort verfügbar.</p>
+      <label class="field"><span>Benutzername</span>
+        <input id="authUser" type="text" autocomplete="username" placeholder="z. B. fabo" /></label>
+      <label class="field"><span>Passwort</span>
+        <input id="authPass" type="password" autocomplete="current-password" placeholder="••••••••" /></label>
+      <div class="auth-error" id="authError" hidden></div>
+      <button class="primary-btn auth-submit" id="authSubmit">Einloggen</button>
+      <div class="auth-switch">
+        <span id="authSwitchText">Noch kein Konto?</span>
+        <button class="link-btn" id="authSwitchBtn">Registrieren</button>
+      </div>
+      <button class="link-btn auth-skip" id="authSkip">Ohne Konto fortfahren (nur dieses Gerät)</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
   <script src="agents.js"></script>
+  <script src="auth.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

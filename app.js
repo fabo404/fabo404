@@ -22,6 +22,100 @@ function init() {
   bindPortable();
   bindMobileNav();
   bindImageAttach();
+  setupAuth();
+}
+
+function refreshAll() {
+  renderRoster();
+  renderProviderList();
+  renderModeUI();
+  updateModePill();
+  renderAccountChip();
+}
+
+/* ---------------- Cloud-Konto (Login) ---------------- */
+let authMode = "login"; // oder "signup"
+
+function setupAuth() {
+  renderAccountChip();
+  if (!Auth.configured()) return;        // ohne Supabase: normaler lokaler Betrieb
+  showAuthGate();
+
+  $("#authSubmit").onclick = submitAuth;
+  $("#authPass").addEventListener("keydown", (e) => { if (e.key === "Enter") submitAuth(); });
+  $("#authSwitchBtn").onclick = () => { authMode = authMode === "login" ? "signup" : "login"; renderAuthMode(); };
+  $("#authSkip").onclick = () => hideAuthGate();
+}
+
+function renderAuthMode() {
+  const login = authMode === "login";
+  $("#authTitle").textContent = login ? "Anmelden" : "Konto erstellen";
+  $("#authSub").textContent = login
+    ? "Melde dich an — danach sind deine Anbieter auf jedem Gerät sofort verfügbar."
+    : "Erstelle ein Konto. Deine Anbieter-Schlüssel werden verschlüsselt gespeichert.";
+  $("#authSubmit").textContent = login ? "Einloggen" : "Registrieren";
+  $("#authSwitchText").textContent = login ? "Noch kein Konto?" : "Schon registriert?";
+  $("#authSwitchBtn").textContent = login ? "Registrieren" : "Einloggen";
+  $("#authError").hidden = true;
+}
+
+function showAuthGate() { $("#authGate").hidden = false; renderAuthMode(); }
+function hideAuthGate() { $("#authGate").hidden = true; }
+
+async function submitAuth() {
+  const u = $("#authUser").value.trim();
+  const p = $("#authPass").value;
+  const errBox = $("#authError");
+  if (!u || !p) { errBox.textContent = "Bitte Benutzername und Passwort eingeben."; errBox.hidden = false; return; }
+
+  const btn = $("#authSubmit");
+  btn.disabled = true; btn.textContent = "…";
+  try {
+    const vault = authMode === "login" ? await Auth.signIn(u, p) : await Auth.signUp(u, p);
+    if (vault) Config.importObject(vault);
+    Config.set({ portable: true }); // Cloud ist die Persistenz → keine lokalen Spuren
+    $("#authPass").value = "";
+    hideAuthGate();
+    refreshAll();
+    toast(authMode === "login" ? "Willkommen zurück, " + Auth.username() + " 👋" : "Konto erstellt 🎉");
+  } catch (e) {
+    errBox.textContent = e.message;
+    errBox.hidden = false;
+  } finally {
+    btn.disabled = false;
+    renderAuthMode();
+  }
+}
+
+function renderAccountChip() {
+  const chip = $("#accountChip");
+  if (!Auth.configured()) { chip.hidden = true; return; }
+  chip.hidden = false;
+  if (Auth.loggedIn()) {
+    chip.innerHTML = `
+      <div class="who"><span class="u">👤 ${esc(Auth.username())}</span><span class="st">angemeldet · Cloud</span></div>
+      <button class="act" id="logoutBtn">Logout</button>`;
+    $("#logoutBtn").onclick = doLogout;
+  } else {
+    chip.innerHTML = `
+      <div class="who"><span class="u">Kein Konto</span><span class="st off">lokal · nur dieses Gerät</span></div>
+      <button class="act" id="loginBtn">Login</button>`;
+    $("#loginBtn").onclick = () => { authMode = "login"; showAuthGate(); };
+  }
+}
+
+function syncCloud() {
+  if (Auth.configured() && Auth.loggedIn()) {
+    Auth.pushVault(Config.get()).catch((e) => toast("Cloud-Sync fehlgeschlagen: " + e.message));
+  }
+}
+
+async function doLogout() {
+  await Auth.signOut();
+  Config.wipe();           // alle Schlüssel aus dem Speicher entfernen
+  refreshAll();
+  showAuthGate();
+  toast("Abgemeldet — keine Spuren auf diesem Gerät.");
 }
 
 /* ---------------- Image attach ---------------- */
@@ -383,6 +477,13 @@ function saveSettingsFromModal() {
   renderModeUI();
   updateModePill();
   $("#settingsModal").hidden = true;
+
+  // In der Cloud sichern, falls angemeldet
+  if (Auth.configured() && Auth.loggedIn()) {
+    Auth.pushVault(Config.get())
+      .then(() => toast("In deinem Konto gespeichert ☁️✓"))
+      .catch((e) => toast("Cloud-Speichern fehlgeschlagen: " + e.message));
+  }
 }
 
 function updateModePill() {
@@ -469,12 +570,14 @@ function saveAgentFromModal() {
   }
   Config.setAgents(agents);
   renderRoster();
+  syncCloud();
   $("#agentModal").hidden = true;
 }
 
 function deleteCurrentAgent() {
   Config.setAgents(Config.get().agents.filter((a) => a.id !== editingAgentId));
   renderRoster();
+  syncCloud();
   $("#agentModal").hidden = true;
 }
 
