@@ -1,0 +1,10 @@
+# Persoenliche Daten / Geheimnisse - NIE committen
+jarvis_data.json
+config.json
+
+# Build-Artefakte
+build/
+dist/
+*.spec
+__pycache__/
+*.pyc

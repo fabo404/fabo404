@@ -1,0 +1,5 @@
+{
+  "_hinweis": "Kopiere diese Datei zu 'config.json' und trage deine Supabase-Daten ein. Ohne diese Datei laeuft JARVIS trotzdem - dann nur ohne Konto-System.",
+  "supabase_url": "https://DEIN-PROJEKT.supabase.co",
+  "supabase_anon_key": "DEIN-ANON-PUBLIC-KEY"
+}

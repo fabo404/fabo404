@@ -1,0 +1,14 @@
+# JARVIS - Windows Desktop / Portable
+# Pflicht:
+requests>=2.31
+
+# Sprache (Mikrofon-Eingabe). Auf Windows installiert sich PyAudio
+# ueber ein fertiges Wheel automatisch mit:
+SpeechRecognition>=3.10
+PyAudio>=0.2.13
+
+# Sprachausgabe (offline, Windows SAPI5):
+pyttsx3>=2.90
+
+# Nur fuer den Build der .exe (nicht zur Laufzeit noetig):
+# pyinstaller>=6.0
