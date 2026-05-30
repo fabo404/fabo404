@@ -24,6 +24,7 @@ import math
 import base64
 import threading
 import queue
+from datetime import datetime, timezone
 
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -154,6 +155,7 @@ DEFAULT_DATA = {
     "voice_out": True,
     "voice_rate": 180,
     "session": None,
+    "history": [],  # Chat-Verlauf (lokal gespeichert, mit Supabase auch geraeteuebergreifend)
 }
 
 
@@ -223,6 +225,31 @@ class Supabase:
         if r.status_code >= 400:
             raise RuntimeError(self._err(r))
         return r.json()
+
+    # ---- Chat-Verlauf geraeteuebergreifend (Tabelle 'jarvis_chats') ----
+    def _auth_headers(self, token):
+        return {"apikey": self.anon, "Authorization": "Bearer " + token,
+                "Content-Type": "application/json"}
+
+    def save_chat(self, token, user_id, messages):
+        r = requests.post(
+            f"{self.url}/rest/v1/jarvis_chats?on_conflict=user_id",
+            headers={**self._auth_headers(token), "Prefer": "resolution=merge-duplicates"},
+            json={"user_id": user_id, "messages": messages,
+                  "updated_at": datetime.now(timezone.utc).isoformat()},
+            timeout=20)
+        if r.status_code >= 400:
+            raise RuntimeError(self._err(r))
+
+    def load_chat(self, token, user_id):
+        r = requests.get(f"{self.url}/rest/v1/jarvis_chats",
+                         headers=self._auth_headers(token),
+                         params={"user_id": "eq." + user_id, "select": "messages"},
+                         timeout=20)
+        if r.status_code >= 400:
+            raise RuntimeError(self._err(r))
+        rows = r.json()
+        return rows[0]["messages"] if rows else []
 
     @staticmethod
     def _err(r):
@@ -465,7 +492,7 @@ class JarvisApp:
         self.busy = False
         self.listening = False
         self.ui_queue = queue.Queue()
-        self.history = []
+        self.history = list(self.data.get("history") or [])
         self._phase = 0
 
         self.tts = None
@@ -481,6 +508,7 @@ class JarvisApp:
         self._poll_queue()
         self._animate()
         self._greet()
+        self._restore_chats()
 
     # ---------- UI ----------
     def _build_ui(self):
@@ -633,6 +661,63 @@ class JarvisApp:
                         f"Guten Tag. Alle Systeme bereit. Aktiv: {names}.{extra}{caps} Womit kann ich helfen?")
         self.set_status("bereit", DIM)
 
+    # ---------- Chat-Verlauf (lokal + geraeteuebergreifend via Supabase) ----------
+    def _sb_session(self):
+        s = self.data.get("session") or {}
+        tok = s.get("access_token")
+        uid = (s.get("user") or {}).get("id")
+        return (tok, uid) if (tok and uid) else (None, None)
+
+    def _restore_chats(self):
+        token, uid = self._sb_session()
+        if token and self.supa.configured:
+            self.set_status("lade Chats aus der Cloud…", CYAN)
+
+            def work():
+                remote = None
+                try:
+                    remote = self.supa.load_chat(token, uid)
+                except Exception:
+                    remote = None
+
+                def apply():
+                    if remote:  # Cloud gewinnt -> auf allen Geraeten gleich
+                        self.history = list(remote)
+                        self.data["history"] = self.history
+                        save_data(self.data)
+                    self._render_history()
+                    self.set_status("bereit", DIM)
+                self.post(apply)
+            threading.Thread(target=work, daemon=True).start()
+        else:
+            self._render_history()
+
+    def _render_history(self):
+        if not self.history:
+            return
+        self._sys("──  frühere Unterhaltung (geräteübergreifend)  ──")
+        for m in self.history[-20:]:
+            if m.get("role") == "user":
+                self.bubble("you", "Du", m.get("content", ""))
+            else:
+                self.bubble("jarvis", "JARVIS", m.get("content", ""))
+        self._sys("──  neue Nachrichten  ──")
+
+    def _persist(self):
+        self.history = self.history[-100:]
+        self.data["history"] = self.history
+        save_data(self.data)
+        token, uid = self._sb_session()
+        if token and self.supa.configured:
+            msgs = list(self.history)
+
+            def push():
+                try:
+                    self.supa.save_chat(token, uid, msgs)
+                except Exception:
+                    pass
+            threading.Thread(target=push, daemon=True).start()
+
     # ---------- Chat-Ausgabe ----------
     def bubble(self, kind, who, text):
         self.chat.config(state="normal")
@@ -727,7 +812,7 @@ class JarvisApp:
 
         self.history.append({"role": "user", "content": text})
         self.history.append({"role": "assistant", "content": final})
-        self.history = self.history[-16:]
+        self._persist()  # lokal speichern + (wenn angemeldet) in die Cloud sync
 
         def idle():
             self.busy = False
@@ -1075,8 +1160,10 @@ class JarvisApp:
                                     "refresh_token": res.get("refresh_token"),
                                     "user": res.get("user", {})}
             save_data(self.data)
-            messagebox.showinfo("Login", "Angemeldet. Du bleibst jetzt eingeloggt.")
+            messagebox.showinfo("Login", "Angemeldet. Deine Chats werden ab jetzt "
+                                "geräteübergreifend in der Cloud gespeichert.")
             win.destroy()
+            self._restore_chats()
         except Exception as e:
             messagebox.showerror("Login fehlgeschlagen", str(e))
 

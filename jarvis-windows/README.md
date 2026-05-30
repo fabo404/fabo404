@@ -90,6 +90,23 @@ eine Verknüpfung anlegen.
 
 ---
 
+## Chats geräteübergreifend (Cloud-Sync)
+
+- **Ohne Anmeldung:** Chats werden lokal in `jarvis_data.json` gespeichert (bleiben nach
+  Neustart da und wandern auf dem USB-Stick mit).
+- **Mit Supabase-Login:** Chats werden zusätzlich in der **Cloud** gespeichert und auf
+  **jedem Gerät** (Windows, Mac, USB) beim Start automatisch geladen — überall derselbe Verlauf.
+
+**Was du dafür einmal ausführen musst:**
+1. Kostenloses Projekt auf https://supabase.com anlegen.
+2. In **Supabase → SQL Editor** den Inhalt von **`supabase_setup.sql`** einfügen und **Run** klicken
+   (legt die Tabelle `jarvis_chats` + Sicherheitsregeln an).
+3. `config.example.json` → `config.json` kopieren und aus **Supabase → Project Settings → API**
+   die **Project URL** und den **anon public key** eintragen.
+4. In JARVIS unter **⚙** auf **Registrieren** und dann **Anmelden** — fertig.
+
+---
+
 ## Sprache (Details)
 
 - **Erkennung (Sprache → Text):** mit OpenAI-Key → **Whisper** (beste Qualität), sonst
