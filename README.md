@@ -1,23 +1,25 @@
 <div align="center">
 
-# 🜂 Synapse
+# ❄️ Freezy AI
 
-### Portable Multi-Agent-App — verbinde KI-Agenten, die miteinander kommunizieren, um das beste Ergebnis zu liefern
+### Portabler Multi-Agent-Hub — verbinde KI-Agenten, die miteinander kommunizieren (auch mit Bildern), um das beste Ergebnis zu liefern
 
 </div>
 
-Synapse ist eine elegante Web-App im Stil von **Google Antigravity** / **Claude Code**.
-Du stellst eine Aufgabe — entweder antwortet **ein einzelnes Modell** (z. B. nur Gemini),
-oder im **Agent-Modus** arbeitet ein ganzes Team aus KI-Agenten zusammen: sie teilen die
-Aufgabe auf, **diskutieren über alle angemeldeten Anbieter hinweg** und **synthetisieren**
-am Ende die stärkste gemeinsame Lösung.
+Freezy AI ist eine elegante Web-App im Stil von **Google Antigravity** / **Claude Code**.
+Du stellst eine Aufgabe (optional **mit Bild**) — entweder antwortet **ein einzelnes Modell**
+(z. B. nur Gemini), oder im **Agent-Modus** arbeitet ein ganzes Team aus KI-Agenten zusammen:
+sie teilen die Aufgabe auf, **diskutieren über alle angemeldeten Anbieter hinweg** und
+**synthetisieren** am Ende die stärkste gemeinsame Lösung.
 
 ## ✨ Features
 
 - **🔌 Portable — keine Rückstände**: Schlüssel bleiben standardmäßig **nur im Arbeitsspeicher**.
   Schließt du den Tab (z. B. am Schul-PC), ist alles weg. Null Spuren.
 - **💾 USB-Konfiguration**: Einmal bei allen Anbietern angemeldet? Speichere die Config als
-  `synapse-config.json` auf deinen **USB-Stick** und lade sie beim nächsten Mal mit einem Klick.
+  `freezy-config.json` auf deinen **USB-Stick** und lade sie beim nächsten Mal mit einem Klick.
+- **📷 Bild-Eingabe (Vision)**: Häng ein Bild an — die Modelle/Agenten analysieren es mit.
+- **📱 Handytauglich**: responsives Layout mit ausklappbarem Menü.
 - **🧠 Mehrere Anbieter gleichzeitig**: **Google Gemini**, **Anthropic Claude**, **OpenAI-kompatibel**.
 - **🎛️ Zwei Modi**:
   - **Einzel** — wähle genau einen Anbieter (z. B. nur Gemini).

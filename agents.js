@@ -1,5 +1,5 @@
 /* ============================================================
- * Synapse · Multi-Agent Orchestration Engine
+ * Freezy AI · Multi-Agent Orchestration Engine
  * - Portable: Schlüssel nur im RAM (keine Rückstände) oder
  *   per Config-Datei auf dem USB-Stick gespeichert
  * - Mehrere Anbieter (Gemini / Claude / OpenAI) gleichzeitig
@@ -58,16 +58,16 @@ const Config = (() => {
 
   // Beim Start: wenn früher NICHT portable gespeichert wurde, laden.
   try {
-    const saved = JSON.parse(localStorage.getItem("synapse.config"));
+    const saved = JSON.parse(localStorage.getItem("freezy.config"));
     if (saved && saved.portable === false) state = { ...DEFAULTS(), ...saved };
   } catch {}
 
   function persistIfAllowed() {
     if (state.portable) {
       // Portable: niemals auf den PC schreiben, evtl. Altlasten entfernen
-      try { localStorage.removeItem("synapse.config"); } catch {}
+      try { localStorage.removeItem("freezy.config"); } catch {}
     } else {
-      try { localStorage.setItem("synapse.config", JSON.stringify(state)); } catch {}
+      try { localStorage.setItem("freezy.config", JSON.stringify(state)); } catch {}
     }
   }
 
@@ -96,7 +96,7 @@ const Config = (() => {
     },
     // Alles aus dem Browser entfernen (Panik-/Aufräum-Knopf in der Schule)
     wipe() {
-      try { localStorage.removeItem("synapse.config"); } catch {}
+      try { localStorage.removeItem("freezy.config"); } catch {}
       try { sessionStorage.clear(); } catch {}
       state = DEFAULTS();
     },
@@ -106,16 +106,19 @@ const Config = (() => {
 /* ============================================================
  * LLM-Aufruf je Anbieter
  * ============================================================ */
-async function callLLM(provider, account, systemPrompt, userText) {
+async function callLLM(provider, account, systemPrompt, userText, image) {
+  // image = { mime: "image/png", b64: "..." }  (optional)
   if (provider === "gemini") {
     const model = account.model || PROVIDERS.gemini.defaultModel;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(account.apiKey)}`;
+    const parts = [{ text: userText }];
+    if (image) parts.push({ inline_data: { mime_type: image.mime, data: image.b64 } });
     const res = await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ role: "user", parts: [{ text: userText }] }],
+        contents: [{ role: "user", parts }],
         generationConfig: { maxOutputTokens: 1024 },
       }),
     });
@@ -125,6 +128,9 @@ async function callLLM(provider, account, systemPrompt, userText) {
   }
 
   if (provider === "anthropic") {
+    const content = [];
+    if (image) content.push({ type: "image", source: { type: "base64", media_type: image.mime, data: image.b64 } });
+    content.push({ type: "text", text: userText });
     const res = await fetch((account.baseUrl || "https://api.anthropic.com") + "/v1/messages", {
       method: "POST",
       headers: {
@@ -137,7 +143,7 @@ async function callLLM(provider, account, systemPrompt, userText) {
         model: account.model || PROVIDERS.anthropic.defaultModel,
         max_tokens: 1024,
         system: systemPrompt,
-        messages: [{ role: "user", content: userText }],
+        messages: [{ role: "user", content }],
       }),
     });
     if (!res.ok) throw new Error("Anthropic " + res.status + ": " + (await res.text()).slice(0, 160));
@@ -146,13 +152,16 @@ async function callLLM(provider, account, systemPrompt, userText) {
   }
 
   // OpenAI-kompatibel
+  const userContent = image
+    ? [{ type: "text", text: userText }, { type: "image_url", image_url: { url: `data:${image.mime};base64,${image.b64}` } }]
+    : userText;
   const res = await fetch((account.baseUrl || "https://api.openai.com/v1") + "/chat/completions", {
     method: "POST",
     headers: { "content-type": "application/json", authorization: "Bearer " + account.apiKey },
     body: JSON.stringify({
       model: account.model || PROVIDERS.openai.defaultModel,
       max_tokens: 1024,
-      messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userText }],
+      messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userContent }],
     }),
   });
   if (!res.ok) throw new Error("OpenAI " + res.status + ": " + (await res.text()).slice(0, 160));
@@ -163,7 +172,7 @@ async function callLLM(provider, account, systemPrompt, userText) {
 /* ============================================================
  * EINZEL-MODUS: direkte Antwort von genau einem Anbieter
  * ============================================================ */
-async function runSingle(task, provider, hooks) {
+async function runSingle(task, provider, hooks, image) {
   const cfg = Config.get();
   const account = cfg.accounts[provider];
   const live = account && account.apiKey;
@@ -178,14 +187,15 @@ async function runSingle(task, provider, hooks) {
   hooks.onPhase("Einzel-Modus · " + agent.name);
   hooks.onThinkStart(agent);
 
+  const prompt = task || (image ? "Beschreibe und analysiere das angehängte Bild." : "");
   let text;
   if (live) {
-    const sys = "Du bist ein hilfreicher, präziser Assistent. Antworte klar und gut strukturiert.";
-    try { text = await callLLM(provider, account, sys, task); }
-    catch (e) { text = "⚠️ API-Fehler: " + e.message + "\n\n" + demoSingle(task); }
+    const sys = "Du bist ein hilfreicher, präziser Assistent. Wenn ein Bild angehängt ist, beziehe dich darauf. Antworte klar und gut strukturiert.";
+    try { text = await callLLM(provider, account, sys, prompt, image); }
+    catch (e) { text = "⚠️ API-Fehler: " + e.message + "\n\n" + demoSingle(prompt, image); }
   } else {
     await wait(700 + Math.random() * 500);
-    text = demoSingle(task);
+    text = demoSingle(prompt, image);
   }
 
   hooks.onThinkEnd(agent);
@@ -198,7 +208,7 @@ async function runSingle(task, provider, hooks) {
  * Agenten werden reihum auf die aktiven Anbieter verteilt,
  * damit wirklich "alle, bei denen du angemeldet bist" mitreden.
  * ============================================================ */
-async function orchestrate(task, rounds, hooks) {
+async function orchestrate(task, rounds, hooks, image) {
   const cfg = Config.get();
   const agents = cfg.agents;
   const enabled = Config.enabledProviders();
@@ -230,9 +240,9 @@ async function orchestrate(task, rounds, hooks) {
 
     let text;
     if (live) {
-      const sys = `${agent.persona}\n\nDu arbeitest in einem Team aus mehreren KI-Agenten (teils auf unterschiedlichen Modellen) an einer gemeinsamen Aufgabe. Antworte fokussiert (max ~180 Wörter), beziehe dich wo sinnvoll auf die Beiträge der anderen.`;
-      const userMsg = `AUFGABE DES NUTZERS:\n${task}\n\n${contextBlock()}\n\nDEINE AUFGABE JETZT:\n${instruction}`;
-      try { text = await callLLM(provider, account, sys, userMsg); }
+      const sys = `${agent.persona}\n\nDu arbeitest in einem Team aus mehreren KI-Agenten (teils auf unterschiedlichen Modellen) an einer gemeinsamen Aufgabe. ${image ? "Dem Nutzer liegt ein BILD bei — beziehe dich darauf. " : ""}Antworte fokussiert (max ~180 Wörter), beziehe dich wo sinnvoll auf die Beiträge der anderen.`;
+      const userMsg = `AUFGABE DES NUTZERS:\n${task || "(Aufgabe ergibt sich aus dem Bild)"}\n\n${contextBlock()}\n\nDEINE AUFGABE JETZT:\n${instruction}`;
+      try { text = await callLLM(provider, account, sys, userMsg, image); }
       catch (e) { text = `⚠️ API-Fehler (${tagged.provider}) — Demo-Antwort:\n\n` + demoResponse(agent, task, transcript, opts); }
     } else {
       await wait(600 + Math.random() * 650);
@@ -268,10 +278,11 @@ async function orchestrate(task, rounds, hooks) {
 /* ============================================================
  * Demo-Antworten (offline)
  * ============================================================ */
-function demoSingle(task) {
-  const topic = task.length > 70 ? task.slice(0, 67).trim() + "…" : task;
+function demoSingle(task, image) {
+  const topic = (task || "Bild-Analyse").length > 70 ? task.slice(0, 67).trim() + "…" : (task || "Bild-Analyse");
+  const imgLine = image ? `\n📷 *Ein Bild wurde erkannt — ein Vision-Modell (z. B. Gemini) würde es hier auswerten.*\n` : "";
   return (
-    `**Antwort** zu *"${topic}"* _(Demo-Modus)_\n\n` +
+    `**Antwort** zu *"${topic}"* _(Demo-Modus)_\n${imgLine}\n` +
     `Hier würde das gewählte Modell direkt antworten. Trage unter **Anbieter & Schlüssel** ` +
     `einen API-Key ein, um echte Antworten zu erhalten.\n\n` +
     `- Punkt 1: Kern der Lösung\n- Punkt 2: konkrete Umsetzung\n- Punkt 3: nächster Schritt`
