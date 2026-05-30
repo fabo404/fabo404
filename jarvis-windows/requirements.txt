@@ -1,0 +1,20 @@
+# JARVIS  -  Windows / macOS / Linux
+# Pflicht:
+requests>=2.31
+
+# Sprache rein (Mikrofon -> Text):
+SpeechRecognition>=3.10
+PyAudio>=0.2.13
+#   Windows: pip installiert PyAudio automatisch (fertiges Wheel).
+#   macOS  : vorher 'brew install portaudio', dann 'pip install pyaudio'.
+#   Linux  : 'sudo apt install portaudio19-dev' vor pip install.
+
+# Sprache raus (Text -> Sprache):
+pyttsx3>=2.90
+#   Windows: nutzt SAPI5 (offline).
+#   macOS  : nutzt NSSpeechSynthesizer; benoetigt ggf. 'pip install pyobjc'.
+#            Faellt sonst automatisch auf den eingebauten 'say'-Befehl zurueck.
+
+# Nur fuer den Build der App (nicht zur Laufzeit):
+# pyinstaller>=6.0
+# pyobjc>=10.0    # (nur macOS, fuer pyttsx3-Stimme im .app-Build)
