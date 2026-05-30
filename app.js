@@ -1,5 +1,5 @@
 /* ============================================================
- * Synapse · UI-Controller (Portable Edition)
+ * Freezy AI · UI-Controller (Portable Edition)
  * ============================================================ */
 
 const $ = (s) => document.querySelector(s);
@@ -8,6 +8,7 @@ const el = (tag, cls) => { const e = document.createElement(tag); if (cls) e.cla
 let running = false;
 let editingAgentId = null;
 let selectedAvatar = AVATAR_PALETTE[0];
+let attachedImage = null; // { mime, b64, dataUrl, name }
 
 /* ---------------- Init ---------------- */
 function init() {
@@ -19,6 +20,54 @@ function init() {
   bindControls();
   bindModals();
   bindPortable();
+  bindMobileNav();
+  bindImageAttach();
+}
+
+/* ---------------- Image attach ---------------- */
+function bindImageAttach() {
+  $("#attachBtn").onclick = () => $("#imgFile").click();
+  $("#imgFile").onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast("Bitte ein Bild auswählen."); return; }
+    if (file.size > 8 * 1024 * 1024) { toast("Bild ist zu groß (max. 8 MB)."); e.target.value = ""; return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      const b64 = dataUrl.split(",")[1];
+      attachedImage = { mime: file.type, b64, dataUrl, name: file.name };
+      $("#imgThumb").src = dataUrl;
+      $("#imgName").textContent = file.name;
+      $("#imgPreview").hidden = false;
+      $("#attachBtn").classList.add("has-img");
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+  $("#imgRemove").onclick = clearImage;
+}
+
+function clearImage() {
+  attachedImage = null;
+  $("#imgPreview").hidden = true;
+  $("#imgThumb").src = "";
+  $("#attachBtn").classList.remove("has-img");
+}
+
+/* ---------------- Mobile drawer ---------------- */
+function bindMobileNav() {
+  const sidebar = document.querySelector(".sidebar");
+  const scrim = $("#scrim");
+  const open = () => { sidebar.classList.add("open"); scrim.hidden = false; };
+  const close = () => { sidebar.classList.remove("open"); scrim.hidden = true; };
+  $("#menuBtn").onclick = () => (sidebar.classList.contains("open") ? close() : open());
+  scrim.onclick = close;
+  // Beim Tippen in der Sidebar (Agent/Modal öffnen) schließen
+  sidebar.addEventListener("click", (e) => {
+    if (e.target.closest(".agent-card, #settingsBtn, .mini-btn")) close();
+  });
+  window.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
 }
 
 /* ---------------- Roster ---------------- */
@@ -120,7 +169,8 @@ function bindControls() {
 async function start() {
   if (running) return;
   const task = $("#taskInput").value.trim();
-  if (!task) return;
+  const image = attachedImage;
+  if (!task && !image) return;
 
   running = true;
   $("#sendBtn").disabled = true;
@@ -128,7 +178,8 @@ async function start() {
   $("#taskInput").value = "";
   $("#taskInput").style.height = "auto";
 
-  addUserMessage(task);
+  addUserMessage(task, image);
+  clearImage();
 
   const hooks = {
     onPhase: (label) => addDivider(label),
@@ -140,10 +191,10 @@ async function start() {
   const cfg = Config.get();
   try {
     if (cfg.mode === "single") {
-      await runSingle(task, cfg.single || "demo", hooks);
+      await runSingle(task, cfg.single || "demo", hooks, image);
     } else {
       const rounds = parseInt($("#roundsSlider").value, 10);
-      await orchestrate(task, rounds, hooks);
+      await orchestrate(task, rounds, hooks, image);
     }
   } catch (e) {
     addDivider("Fehler");
@@ -159,9 +210,19 @@ async function start() {
 }
 
 /* ---------------- Thread rendering ---------------- */
-function addUserMessage(text) {
+function addUserMessage(text, image) {
   const m = el("div", "user-msg");
-  m.textContent = text;
+  if (image) {
+    const img = el("img", "msg-img");
+    img.src = image.dataUrl;
+    img.alt = image.name || "Bild";
+    m.appendChild(img);
+  }
+  if (text) {
+    const span = el("div");
+    span.textContent = text;
+    m.appendChild(span);
+  }
   $("#thread").appendChild(m);
   scrollDown();
 }
@@ -345,7 +406,7 @@ function updateModePill() {
 function bindPortable() {
   $("#saveUsbBtn").onclick = () => {
     const url = URL.createObjectURL(Config.exportBlob());
-    const a = el("a"); a.href = url; a.download = "synapse-config.json";
+    const a = el("a"); a.href = url; a.download = "freezy-config.json";
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast("Konfiguration gespeichert — leg die Datei auf deinen USB-Stick.");
