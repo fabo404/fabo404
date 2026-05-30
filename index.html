@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Synapse · Multi-Agent Orchestrierung</title>
+  <meta name="description" content="Portable App: verbinde mehrere KI-Agenten, die miteinander kommunizieren, um das beste Ergebnis zu liefern." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🜂</text></svg>" />
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="bg-glow"></div>
+
+  <!-- ===== Sidebar ===== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">🜂</div>
+      <div class="brand-text">
+        <span class="brand-name">Synapse</span>
+        <span class="brand-sub">Portable · Agent OS</span>
+      </div>
+    </div>
+
+    <nav class="agent-roster" id="agentRoster">
+      <div class="roster-head">
+        <span>Verbundene Agenten</span>
+        <button class="icon-btn" id="addAgentBtn" title="Agent hinzufügen">+</button>
+      </div>
+      <div class="roster-list" id="rosterList"></div>
+
+      <div class="roster-head" style="margin-top:16px">
+        <span>Angemeldete Anbieter</span>
+      </div>
+      <div class="provider-list" id="providerList"></div>
+    </nav>
+
+    <div class="sidebar-foot">
+      <button class="ghost-btn" id="settingsBtn">
+        <span class="dot"></span> Anbieter &amp; Schlüssel
+      </button>
+      <div class="portable-row">
+        <button class="mini-btn" id="saveUsbBtn" title="Konfiguration auf USB-Stick speichern">⤓ USB</button>
+        <button class="mini-btn" id="loadUsbBtn" title="Konfiguration vom USB-Stick laden">⤒ Laden</button>
+        <button class="mini-btn danger" id="wipeBtn" title="Alle Spuren auf diesem PC löschen">⌫ Wipe</button>
+      </div>
+      <input type="file" id="usbFile" accept="application/json" hidden />
+      <div class="mode-pill" id="modePill">Portable · Demo</div>
+    </div>
+  </aside>
+
+  <!-- ===== Main ===== -->
+  <main class="stage">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1>Kollaborations-Konsole</h1>
+        <p class="subtitle">Wähle einen einzelnen Anbieter oder lass alle im Agent-Modus zusammenarbeiten</p>
+      </div>
+      <div class="topbar-right">
+        <div class="mode-switch" id="modeSwitch">
+          <button data-mode="single" id="modeSingle">Einzel</button>
+          <button data-mode="agent" id="modeAgent" class="active">Agent-Modus</button>
+        </div>
+        <select class="provider-select" id="singleProvider" hidden></select>
+        <div class="rounds-ctrl" id="roundsCtrl">
+          <label>Runden</label>
+          <input type="range" id="roundsSlider" min="1" max="4" value="2" />
+          <span id="roundsVal">2</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="board" id="board">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-orb">🜂</div>
+        <h2>Stelle eine Aufgabe</h2>
+        <p>Im <b>Agent-Modus</b> teilen deine Agenten die Aufgabe auf, diskutieren über alle<br/>angemeldeten Anbieter hinweg und synthetisieren das stärkste Ergebnis.</p>
+        <div class="suggestions" id="suggestions">
+          <button>Entwirf eine Markteinführungs-Strategie für eine Klima-App</button>
+          <button>Schreibe &amp; reviewe eine Python-Funktion für Primzahlen</button>
+          <button>Plane eine 7-tägige Japan-Reise mit kleinem Budget</button>
+        </div>
+      </div>
+      <div class="thread" id="thread"></div>
+    </section>
+
+    <footer class="composer">
+      <div class="composer-inner">
+        <textarea id="taskInput" rows="1" placeholder="Beschreibe deine Aufgabe…"></textarea>
+        <button class="send-btn" id="sendBtn" title="Starten">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3.4 20.4 21 12 3.4 3.6 3.39 10.3 15 12l-11.61 1.7z"/></svg>
+        </button>
+      </div>
+      <div class="composer-hint"><kbd>Enter</kbd> startet · <kbd>Shift</kbd>+<kbd>Enter</kbd> neue Zeile · Portable-Modus hinterlässt keine Spuren</div>
+    </footer>
+  </main>
+
+  <!-- ===== Settings / Accounts Modal ===== -->
+  <div class="modal-backdrop" id="settingsModal" hidden>
+    <div class="modal wide">
+      <div class="modal-head">
+        <h3>Anbieter &amp; Schlüssel</h3>
+        <button class="icon-btn" id="closeSettings">×</button>
+      </div>
+      <div class="modal-body">
+        <label class="toggle-field">
+          <input type="checkbox" id="portableToggle" checked />
+          <span><b>Portable-Modus</b> — Schlüssel bleiben nur im Arbeitsspeicher. Beim Schließen des Tabs ist alles weg (keine Rückstände auf dem PC). Zum Behalten: „⤓ USB".</span>
+        </label>
+        <div class="accounts" id="accountsContainer"></div>
+        <p class="modal-note">Melde dich bei einem oder mehreren Anbietern an. Im <b>Agent-Modus</b> arbeiten alle aktiven Anbieter zusammen; im <b>Einzel-Modus</b> wählst du oben einen aus.</p>
+      </div>
+      <div class="modal-foot">
+        <button class="ghost-btn" id="cancelSettings">Schließen</button>
+        <button class="primary-btn" id="saveSettings">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Agent Editor Modal ===== -->
+  <div class="modal-backdrop" id="agentModal" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="agentModalTitle">Agent hinzufügen</h3>
+        <button class="icon-btn" id="closeAgent">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="avatar-row" id="avatarRow"></div>
+        <label class="field">
+          <span>Name · Rolle</span>
+          <input type="text" id="agentName" placeholder="z. B. Sicherheits-Analyst · Security" />
+        </label>
+        <label class="field">
+          <span>Spezialität (System-Prompt)</span>
+          <textarea id="agentPersona" rows="3" placeholder="Worauf achtet dieser Agent? Wie denkt er?"></textarea>
+        </label>
+      </div>
+      <div class="modal-foot">
+        <button class="ghost-btn danger" id="deleteAgent" hidden>Entfernen</button>
+        <button class="primary-btn" id="saveAgent">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="agents.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
